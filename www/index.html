@@ -199,6 +199,8 @@ button.ins:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #lock{position:fixed;inset:0;z-index:100;background:radial-gradient(120% 40% at 50% 0%,rgba(139,92,246,.35),transparent 62%),var(--app);display:grid;place-content:center;justify-items:center;gap:12px;text-align:center;padding:24px}
 #lock svg{width:56px;height:56px;stroke:var(--accent-2);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #lock b{font:600 1.3rem var(--display)} #lock span{color:var(--ink-2);max-width:260px}
+.rec.tap{cursor:pointer}
+.rec.tap:focus-visible{outline:2px solid var(--accent-2);outline-offset:-2px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--app);padding:10px 16px;border-radius:10px;font-size:.86rem;z-index:50;max-width:90vw}
 </style>
 </head>
@@ -278,7 +280,7 @@ function dbPersist(){
     savedRows.set(t.id, sig);
   }
   for (const id of [...savedRows.keys()]) if (!seen.has(id)) { set.push({ statement: "DELETE FROM tx WHERE id = ?", values: [id] }); savedRows.delete(id); }
-  for (const [k, v] of Object.entries({ rules: JSON.stringify(RULES), settings: JSON.stringify(SET), imports: JSON.stringify(IMPORTS) }))
+  for (const [k, v] of Object.entries({ rules: JSON.stringify(RULES), settings: JSON.stringify(SET), imports: JSON.stringify(IMPORTS), names: JSON.stringify(NAMES) }))
     if (savedKV[k] !== v) { set.push({ statement: "INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", values: [k, v] }); savedKV[k] = v; }
   for (let i = 0; i < set.length; i += 250) { const part = set.slice(i, i + 250);
     dbQueue = dbQueue.then(() => sqlite.executeSet({ database: DB, set: part, transaction: true, readonly: false })).catch(e => { console.error("db", e); notify("Couldn't save to the database: " + (e.message || e)); }); }
@@ -288,12 +290,12 @@ async function bootDatabase(){
   const { rows, kv } = await dbLoad();
   const parse = (k, d) => { try { return kv[k] ? JSON.parse(kv[k]) : d; } catch { return d; } };
   if (rows.length || kv.settings) {
-    TX = rows; RULES = parse("rules", {}); IMPORTS = parse("imports", []); SET = Object.assign({ me: "", family: "", small: 200, lock: false }, parse("settings", {}));
-    rows.forEach(t => savedRows.set(t.id, rowSig(t))); savedKV = { rules: kv.rules, settings: kv.settings, imports: kv.imports };
+    TX = rows; RULES = parse("rules", {}); NAMES = parse("names", {}); IMPORTS = parse("imports", []); SET = Object.assign({ me: "", family: "", small: 200, lock: false }, parse("settings", {}));
+    rows.forEach(t => savedRows.set(t.id, rowSig(t))); savedKV = { rules: kv.rules, settings: kv.settings, imports: kv.imports, names: kv.names };
   }
   persist = dbPersist;       // from here on, saving goes to the database
   if (!rows.length && TX.length) { dbPersist(); await dbQueue; }   // one-time move from the old browser storage
-  ["tx", "rules", "settings", "imports"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} });
+  ["tx", "rules", "settings", "imports", "names"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} });
 }
 
 /* ---- App lock: fingerprint, face or the phone's own PIN/pattern ---- */
@@ -549,29 +551,35 @@ function Spends(){
 function openTx(id){
   const t = TX.find(x => x.id === id); if (!t) return;
   const opts = Object.keys(CATS).filter(c => (CATS[c][0] === "income") === (t.dir === "in") || ["Own accounts", "Family"].includes(c));
-  const same = TX.filter(x => pkey(x.payee) === pkey(t.payee)).length;
+  const same = TX.filter(x => autoKey(x) === autoKey(t)).length;
   sheet(`<h3>${esc(t.payee)}</h3>
     <div style="font:600 1.6rem var(--display)" class="num ${t.dir === "in" ? "in" : ""}">${t.dir === "in" ? "+" : "−"}${inr(t.amt)}</div>
     <dl class="kv"><dt>Date</dt><dd>${fdate(t.date)} ${t.date.slice(0, 4)}</dd><dt>Account</dt><dd>${esc(t.bank)} ••${esc(t.acct)}</dd><dt>Type</dt><dd>${esc(t.channel)}${t.kind ? " · " + esc(t.kind) : ""}</dd>
-    <dt>Balance after</dt><dd>${t.bal != null ? inr(t.bal) : "–"}</dd><dt>Bank's text</dt><dd class="muted">${esc(t.desc)}</dd><dt>Why</dt><dd>${esc(t.why || "")}</dd></dl>
+    <dt>Balance after</dt><dd>${t.bal != null ? inr(t.bal) : "–"}</dd>${t.auto && t.auto !== t.payee ? `<dt>Bank's name</dt><dd>${esc(t.auto)}</dd>` : ""}<dt>Bank's text</dt><dd class="muted">${esc(t.desc)}</dd><dt>Why</dt><dd>${esc(t.why || "")}</dd></dl>
     <div class="field"><label for="catPick">Category</label><select id="catPick">${opts.map(c => `<option ${c === t.cat ? "selected" : ""}>${c}</option>`).join("")}</select></div>
     <label class="check"><input type="checkbox" id="always" checked> Always use this for ${esc(t.payee)} (${same} payment${same > 1 ? "s" : ""})</label>
+    <div class="field"><label for="nameIn">Name</label><input id="nameIn" maxlength="40" value="${esc(t.payee)}" autocomplete="off">
+      <span class="muted">Change it to something you recognise, like "Term insurance". Applies to all ${same} payment${same > 1 ? "s" : ""} from ${esc(t.auto || t.payee)}. Clear it to go back to the bank's name.</span></div>
     <div class="btns">${needsCheck(t) ? '<button class="btn" id="okCat">Looks right</button>' : '<button class="btn" data-close>Cancel</button>'}<button class="btn primary" id="saveCat">Save</button></div>`, root => {
     const ok = root.querySelector("#okCat");
     if (ok) ok.onclick = () => { t.ok = true; save(); closeSheet(); toast("Marked as checked."); go(current); };
     root.querySelector("#saveCat").onclick = () => {
       const c = root.querySelector("#catPick").value;
-      if (root.querySelector("#always").checked) { RULES[pkey(t.payee)] = c; TX.forEach(x => { if (pkey(x.payee) === pkey(t.payee) && x.catSrc !== "you") x.catSrc = ""; }); }
-      else { t.cat = c; t.catSrc = "you"; }
+      const changedCat = c !== t.cat, newName = root.querySelector("#nameIn").value.replace(/\s+/g, " ").trim(), renamed = newName !== t.payee;
+      if (changedCat) {
+        if (root.querySelector("#always").checked) { RULES[autoKey(t)] = c; TX.forEach(x => { if (autoKey(x) === autoKey(t) && x.catSrc !== "you") x.catSrc = ""; }); }
+        else { t.cat = c; t.catSrc = "you"; }
+      }
       t.ok = true;
-      recategoriseAll(); closeSheet(); toast(`Saved. ${t.payee} is now ${c}.`); go(current);
+      if (renamed) renamePayee(t, newName); else recategoriseAll();
+      closeSheet(); toast(renamed ? `Saved. Now shown as ${t.payee}.` : `Saved. ${t.payee} is now ${c}.`); go(current);
     };
   });
 }
 
 function recRow(r){
-  const due = r.active ? (r.next >= new Date().toISOString().slice(0, 10) ? `Next ${fdate(r.next)}` : `Expected ${fdate(r.next)}`) : `Last ${fdate(r.last)}`;
-  return `<div class="rec">${av(r.payee, r.cat)}<div class="t"><b>${esc(r.payee)}</b><span>${r.freq} · ${esc(r.cat)} · ${r.n} times · ${due}</span>
+  const due = r.active ? (r.next >= today() ? `Next ${fdate(r.next)}` : `Expected ${fdate(r.next)}`) : `Last ${fdate(r.last)}`;
+  return `<div class="rec tap" role="button" tabindex="0" data-id="${esc(r.tx[r.tx.length - 1].id)}">${av(r.payee, r.cat, r.tx[r.tx.length - 1].desc)}<div class="t"><b>${esc(r.payee)}</b><span>${r.freq} · ${esc(r.cat)} · ${r.n} times · ${due}</span>
     <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${r.channel === "Auto-debit" ? '<span class="tag">auto-debit</span>' : ""}${r.active ? "" : '<span class="tag warn">stopped?</span>'}${r.change > 0 ? `<span class="tag bad">up ${inr(r.change)}</span>` : ""}${r.fixed ? "" : '<span class="tag">amount varies</span>'}</div></div>
     <div class="a ${r.dir === "in" ? "in" : ""}">${r.fixed ? "" : "~"}${inr(r.typ)}<small>${inr(r.total)} so far</small></div></div>`;
 }
@@ -705,7 +713,8 @@ function Settings(){
       <div class="field"><label for="fam">Family names</label><input id="fam" value="${esc(SET.family)}" placeholder="e.g. surname, mother's name"><span class="muted">Comma separated. Matching payments go under Family.</span></div>
       <div class="field"><label for="small">Small payment limit (₹)</label><input id="small" type="number" min="10" value="${SET.small}"></div>
       <button class="btn primary" id="saveSet">Save and re-sort</button></section>
-    <section class="card"><h2>What you taught it</h2>${Object.keys(RULES).length ? Object.entries(RULES).map(([k, c]) => `<div class="sechead"><span>${esc(TX.find(t => pkey(t.payee) === k)?.payee || k)} → <b>${esc(c)}</b></span><button class="btn small danger" data-rule="${esc(k)}">Remove</button></div>`).join("") : '<span class="muted">Tap any transaction to change its category. It remembers for next time.</span>'}</section>
+    <section class="card"><h2>What you taught it</h2>${Object.keys(RULES).length ? Object.entries(RULES).map(([k, c]) => `<div class="sechead"><span>${esc(TX.find(t => autoKey(t) === k)?.payee || k)} → <b>${esc(c)}</b></span><button class="btn small danger" data-rule="${esc(k)}">Remove</button></div>`).join("") : '<span class="muted">Tap any transaction to change its category or name. It remembers for next time.</span>'}
+      ${Object.entries(NAMES).map(([k, n]) => `<div class="sechead"><span>${esc(TX.find(t => autoKey(t) === k)?.auto || k)} is shown as <b>${esc(n)}</b></span><button class="btn small danger" data-name="${esc(k)}">Remove</button></div>`).join("")}</section>
     <section class="card"><h2>Saved PDF passwords</h2><span class="muted">Tried automatically on new statements. ${NATIVE ? "Kept encrypted in this phone's keystore." : "Stored only on this device."}</span>
       ${PW.length ? PW.map((p, i) => `<div class="sechead"><span>${esc(p.label || "Statement")} <span class="muted num">••••${esc(String(p.pw).slice(-2))}</span></span><button class="btn small danger" data-pw="${i}">Forget</button></div>`).join("") : '<span class="muted">None saved.</span>'}</section>
     ${NATIVE ? `<section class="card"><div class="sechead"><h2>App lock</h2><span class="tag ${SET.lock ? "ok" : ""}">${SET.lock ? "On" : "Off"}</span></div>
@@ -743,6 +752,7 @@ function Settings(){
   document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => b.dataset.go === "check" ? reviewNow() : go(b.dataset.go));
   $("#saveSet").onclick = () => { SET.me = $("#me").value; SET.family = $("#fam").value; SET.small = +$("#small").value || 200; recategoriseAll(); toast("Saved. Transactions re-sorted."); };
   document.querySelectorAll("[data-rule]").forEach(b => b.onclick = () => { delete RULES[b.dataset.rule]; recategoriseAll(); go("settings"); });
+  document.querySelectorAll("[data-name]").forEach(b => b.onclick = () => { delete NAMES[b.dataset.name]; recategoriseAll(); go("settings"); });
   document.querySelectorAll("[data-pw]").forEach(b => b.onclick = () => { PW.splice(+b.dataset.pw, 1); savePw(); go("settings"); });
   $("#csv").onclick = () => {
     const rows = [["Date","Bank","Account","Payee","Category","Type","Out","In","Balance","Bank text"], ...TX.map(t => [t.date, t.bank, t.acct, t.payee, t.cat, t.channel, t.dir === "out" ? t.amt : "", t.dir === "in" ? t.amt : "", t.bal ?? "", t.desc])];
@@ -750,7 +760,7 @@ function Settings(){
     saveFile(`fintrack-${today()}.csv`, "\ufeff" + csv, "text/csv").catch(e => { if (!/cancel/i.test(e.message || "")) toast("Couldn't save the file: " + (e.message || e)); });
   };
   $("#wipe").onclick = () => sheet(`<h3>Delete all data?</h3><p class="muted">This removes ${TX.length} transactions, your categories and saved passwords from this device. It can't be undone.</p><div class="btns"><button class="btn" data-close>Keep</button><button class="btn primary" id="yes" style="background:var(--bad);border-color:var(--bad)">Delete everything</button></div>`,
-    r => r.querySelector("#yes").onclick = () => { TX = []; PW = []; savePw(); RULES = {}; IMPORTS = []; ["tx","pw","rules","imports"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} }); save(); closeSheet(); go("home"); toast("All data deleted."); });
+    r => r.querySelector("#yes").onclick = () => { TX = []; PW = []; savePw(); RULES = {}; NAMES = {}; IMPORTS = []; ["tx","pw","rules","imports","names"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} }); save(); closeSheet(); go("home"); toast("All data deleted."); });
 }
 
 /* ================= sheet + password prompt ================= */
@@ -783,6 +793,8 @@ function askPassword(name, wrong){
 }
 
 /* ================= boot ================= */
+$("#screen").addEventListener("click", e => { const r = e.target.closest(".rec.tap"); if (r) openTx(r.dataset.id); });
+$("#screen").addEventListener("keydown", e => { const r = e.target.closest(".rec.tap"); if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTx(r.dataset.id); } });
 document.querySelector("nav.tabs").onclick = e => { const b = e.target.closest(".tab"); if (b) go(b.dataset.tab); };
 $("#fab").onclick = () => go("add");
 $("#backBtn").onclick = () => go(current === "recurring" ? "settings" : "home");

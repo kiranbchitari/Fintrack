@@ -13,10 +13,11 @@ let PW = store.get("pw", []);
 // How saved PDF passwords are kept. The Android app replaces this with the phone's encrypted keystore.
 let savePw = () => store.set("pw", PW);              // saved PDF passwords [{pw, label, used}]
 let RULES = store.get("rules", {});        // payeeKey -> category (taught by you)
+let NAMES = store.get("names", {});        // payeeKey -> the name you gave it ("Razorpay" -> "Term insurance")
 let SET = Object.assign({ me: "", family: "", small: 200, lock: false }, store.get("settings", {}));
 let IMPORTS = store.get("imports", []);
 // Where everything is saved. A browser uses its own storage; the Android app swaps in its encrypted database.
-let persist = () => { store.set("tx", TX); store.set("rules", RULES); store.set("settings", SET); store.set("imports", IMPORTS); };
+let persist = () => { store.set("tx", TX); store.set("rules", RULES); store.set("settings", SET); store.set("imports", IMPORTS); store.set("names", NAMES); };
 const save = () => persist();
 
 /* ================= formatting ================= */
@@ -83,6 +84,13 @@ const CANON = [
   [/DOMINOS/i, "Domino's"], [/NAMMA BE|nammabenga/i, "Namma Metro"], [/MSRTC/i, "MSRTC"], [/nwkrtc/i, "NWKRTC"], [/BOOKMYSHOW/i, "BookMyShow"],
   [/AMAZON PAY/i, "Amazon Pay"], [/CTRAZORPAY/i, "Razorpay"], [/Int\.?\s?Pd|INTEREST (PAID|CREDIT)/i, "Savings interest"],
 ];
+const autoKey = t => pkey(t.auto || t.payee);   // key of the bank's own name for this payee
+// Give a payee your own name. An empty name goes back to the bank's name.
+function renamePayee(t, name){
+  name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (!name || name === t.auto) delete NAMES[autoKey(t)]; else NAMES[autoKey(t)] = name;
+  recategoriseAll();
+}
 const pkey = n => n.toLowerCase().replace(/[^a-z]/g, "").slice(0, 10);
 
 /* ================= categories ================= */
@@ -207,7 +215,10 @@ function recategoriseAll(){
     const cn = p.kind !== "person" && CANON.find(c => c[0].test(clean));
     t.payee = cn ? cn[1] : tidy(p.name); t.kind = p.kind; t.channel = channelOf(t.desc);
   });
-  mergeNames(); matchOwnTransfers(); TX.forEach(categorise); save();
+  mergeNames(); matchOwnTransfers(); TX.forEach(categorise);
+  // Your own names go on last. t.auto keeps the bank's name, which is what rules and renames are keyed by.
+  TX.forEach(t => { t.auto = t.payee; const n = NAMES[pkey(t.payee)]; if (n) t.payee = n; });
+  save();
 }
 
 /* ================= PDF reading ================= */
@@ -513,7 +524,7 @@ function unusual(rows){
 function makeBackup(includePasswords){
   const b = { app: "fintrack", version: 1, exported: today(),
     tx: TX.map(t => ({ id: t.id, bank: t.bank, acct: t.acct, date: t.date, desc: t.desc, amt: t.amt, dir: t.dir, bal: t.bal, file: t.file, ...(t.catSrc === "you" ? { cat: t.cat, catSrc: "you" } : {}), ...(t.ok ? { ok: true } : {}) })),
-    rules: RULES, settings: SET, imports: IMPORTS };
+    rules: RULES, names: NAMES, settings: SET, imports: IMPORTS };
   if (includePasswords) b.passwords = PW;
   return b;
 }
@@ -532,6 +543,7 @@ function restoreBackup(b){
     added++;
   }
   for (const [k, c] of Object.entries(b.rules || {})) if (!RULES[k] && CATS[c]) { RULES[k] = c; rules++; }
+  for (const [k, n] of Object.entries(b.names || {})) if (!NAMES[k] && typeof n === "string" && n.trim()) NAMES[k] = n.trim().slice(0, 40);
   if (b.settings) { if (!SET.me && typeof b.settings.me === "string") SET.me = b.settings.me; if (!SET.family && typeof b.settings.family === "string") SET.family = b.settings.family; }
   let pws = 0;
   for (const p of Array.isArray(b.passwords) ? b.passwords : []) if (p && typeof p.pw === "string" && !PW.find(x => x.pw === p.pw)) { PW.push({ pw: p.pw, label: String(p.label || ""), used: 0 }); pws++; }

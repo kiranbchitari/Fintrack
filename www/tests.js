@@ -2,7 +2,7 @@
 const results = [];
 let group = "";
 function check(name, cond, detail){ results.push({ group, name, pass: !!cond, detail: cond ? "" : detail }); }
-function reset(){ TX.length = 0; RULES = {}; SET = { me: "", family: "", small: 200 }; IMPORTS.length = 0; }
+function reset(){ TX.length = 0; RULES = {}; NAMES = {}; SET = { me: "", family: "", small: 200 }; IMPORTS.length = 0; }
 const row = (date, desc, amt, dir, bal = null) => ({ date, desc, amt, dir, bal });
 function one(desc, dir, amt, bank = "Axis"){ reset(); addStatement({ bank, acct: "1111", rows: [row("2026-03-10", desc, amt, dir, 1000)] }, "t"); return TX[0]; }
 function expectCat(label, desc, dir, amt, cat, extra = {}, bank){
@@ -201,6 +201,28 @@ reset();
   check("A card bill that swings from 58 to 80,819 is not a fixed commitment", cm.variableItems.length === 1 && /cred/i.test(cm.variableItems[0].payee), cm.variableItems.map(x => x.payee).join(", "));
   check("Regular money to a person is not counted as a commitment", ![...cm.fixedItems, ...cm.variableItems].some(x => /meena/i.test(x.payee)), "included");
 }
+
+
+group = "Your own names for payees";
+reset();
+addStatement({ bank: "SBI", acct: "2222", rows: [
+  row("2026-02-25", "DEBIT ACHDr NACH00000000012345 CTRAZORPAY", 933, "out", 5000), row("2026-03-25", "DEBIT ACHDr NACH00000000012345 CTRAZORPAY", 933, "out", 4000),
+  row("2026-04-25", "DEBIT ACHDr NACH00000000012345 CTRAZORPAY", 933, "out", 3000), row("2026-04-26", "WDL TFR UPI/DR/1/MAHESH B/YESB/paytm.s1ey/UPI", 65, "out", 2935) ] }, "n");
+renamePayee(TX[0], "Term insurance");
+const rz = TX.filter(t => /RAZORPAY/.test(t.desc));
+check("Renaming one payment renames every payment from that payee", rz.every(t => t.payee === "Term insurance" && t.auto === "Razorpay"), rz.map(t => t.payee + "/" + t.auto).join(" | "));
+check("Other payees keep their names", TX[3].payee !== "Term insurance", TX[3].payee);
+check("The category is unchanged by a rename", rz.every(t => t.cat === "Insurance"), rz.map(t => t.cat).join(" | "));
+check("Recurring shows the new name", detectRecurring().some(x => x.payee === "Term insurance" && x.typ === 933), detectRecurring().map(x => x.payee).join(", "));
+RULES[autoKey(TX[0])] = "Health"; recategoriseAll();
+check("A category you teach after renaming still applies", rz.every(t => t.cat === "Health" && t.payee === "Term insurance"), rz.map(t => t.cat + "/" + t.payee).join(" | "));
+addStatement({ bank: "SBI", acct: "2222", rows: [row("2026-05-25", "DEBIT ACHDr NACH00000000012345 CTRAZORPAY", 933, "out", 2002)] }, "n2");
+check("New statements use your name too", TX[TX.length - 1].payee === "Term insurance", TX[TX.length - 1].payee);
+const bk2 = JSON.parse(JSON.stringify(makeBackup(false)));
+reset(); restoreBackup(bk2);
+check("Your names survive backup and restore", TX.filter(t => /RAZORPAY/.test(t.desc)).every(t => t.payee === "Term insurance"), TX.map(t => t.payee).join(" | "));
+renamePayee(TX[0], "");
+check("Clearing the name goes back to the bank's name", TX[0].payee === "Razorpay" && !Object.keys(NAMES).length, TX[0].payee);
 
 /* ---------- results ---------- */
 const failed = results.filter(r => !r.pass).length;
