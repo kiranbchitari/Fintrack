@@ -13,9 +13,11 @@ let PW = store.get("pw", []);
 // How saved PDF passwords are kept. The Android app replaces this with the phone's encrypted keystore.
 let savePw = () => store.set("pw", PW);              // saved PDF passwords [{pw, label, used}]
 let RULES = store.get("rules", {});        // payeeKey -> category (taught by you)
-let SET = Object.assign({ me: "", family: "", small: 200 }, store.get("settings", {}));
+let SET = Object.assign({ me: "", family: "", small: 200, lock: false }, store.get("settings", {}));
 let IMPORTS = store.get("imports", []);
-const save = () => { store.set("tx", TX); store.set("rules", RULES); store.set("settings", SET); store.set("imports", IMPORTS); };
+// Where everything is saved. A browser uses its own storage; the Android app swaps in its encrypted database.
+let persist = () => { store.set("tx", TX); store.set("rules", RULES); store.set("settings", SET); store.set("imports", IMPORTS); };
+const save = () => persist();
 
 /* ================= formatting ================= */
 const inr = n => (n < 0 ? "−₹" : "₹") + Math.round(Math.abs(n)).toLocaleString("en-IN");

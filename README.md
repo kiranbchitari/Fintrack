@@ -4,6 +4,7 @@ An Android app that reads your bank statement PDFs on the phone and shows where 
 
 - **No AI.** Everything is done with fixed rules you can read in `www/core.js`.
 - **Nothing is uploaded.** Statements, transactions and passwords stay on the device. Android cloud backup of app data is switched off.
+- **Encrypted on the phone.** Transactions live in an encrypted SQLite database (SQLCipher); PDF passwords in the Android Keystore. An optional app lock asks for fingerprint or the phone's screen lock.
 - **Works offline.** Fonts, the PDF reader and all icons are bundled.
 
 ## What it does
@@ -22,7 +23,7 @@ An Android app that reads your bank statement PDFs on the phone and shows where 
 | Path | What it is |
 |---|---|
 | `www/core.js` | Statement reading, categories, duplicates, recurring, dashboard numbers, backup. Shared by the app and the tests. |
-| `www/index.html` | The screens. Also holds the small Android bridge (share sheet, keystore, back button). |
+| `www/index.html` | The screens. Also holds the Android bridge: encrypted database, app lock, share sheet, keystore, back button. In a plain browser it falls back to browser storage. |
 | `www/icons.js`, `www/logos/` | Category icons and brand logos. See the note on logos below. |
 | `www/tests.js`, `www/tests.html` | Rule tests. Sample bank lines use made-up names and numbers. |
 | `android/` | The Android project (Capacitor 8). |

@@ -5,5 +5,14 @@
   "android": {
     "allowMixedContent": false,
     "backgroundColor": "#0c0a14"
-  }
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": true,
+      "androidBiometric": {
+        "biometricAuth": false
+      }
+    }
+  },
+  "loggingBehavior": "none"
 }

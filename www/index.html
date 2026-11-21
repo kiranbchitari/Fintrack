@@ -196,6 +196,9 @@ button.ins:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wkc{display:grid;gap:4px;justify-items:center;font-size:.72rem;color:var(--ink-3)}
 .wkb{height:90px;width:100%;display:flex;align-items:flex-end;justify-content:center}
 .wkb i{display:block;width:60%;max-width:26px;background:var(--accent);border-radius:4px 4px 0 0}
+#lock{position:fixed;inset:0;z-index:100;background:radial-gradient(120% 40% at 50% 0%,rgba(139,92,246,.35),transparent 62%),var(--app);display:grid;place-content:center;justify-items:center;gap:12px;text-align:center;padding:24px}
+#lock svg{width:56px;height:56px;stroke:var(--accent-2);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#lock b{font:600 1.3rem var(--display)} #lock span{color:var(--ink-2);max-width:260px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--app);padding:10px 16px;border-radius:10px;font-size:.86rem;z-index:50;max-width:90vw}
 </style>
 </head>
@@ -229,12 +232,92 @@ async function saveFile(name, text, mime){
   const fs = plugin("Filesystem"), share = plugin("Share");
   if (fs && share) {
     const w = await fs.writeFile({ path: name, data: text, directory: "CACHE", encoding: "utf8" });
-    await share.share({ title: name, files: [w.uri], dialogTitle: "Save or send " + name });
+    try { await share.share({ title: name, files: [w.uri], dialogTitle: "Save or send " + name }); }
+    finally { setTimeout(() => fs.deleteFile({ path: name, directory: "CACHE" }).catch(() => {}), 5 * 60 * 1000); } // give the receiving app time to copy it
     return "shared";
   }
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; a.click();
   return "downloaded";
 }
+// Exported files are temporary copies. Anything left over from an earlier run is removed at start.
+async function cleanTempFiles(){
+  const fs = plugin("Filesystem"); if (!fs) return;
+  try { const r = await fs.readdir({ path: "", directory: "CACHE" }); for (const f of r.files || []) if (/^fintrack-.*\.(json|csv)$/.test(f.name)) await fs.deleteFile({ path: f.name, directory: "CACHE" }).catch(() => {}); } catch {}
+}
+
+/* ---- Encrypted SQLite database (Android). Tables: tx = one row per transaction, kv = rules, settings, import history. ---- */
+const DB = "fintrack", sqlite = plugin("CapacitorSQLite");
+const savedRows = new Map(); let savedKV = {}, dbQueue = Promise.resolve();
+const rowSig = t => (t.catSrc === "you" ? t.cat : "") + "|" + (t.ok ? 1 : 0);
+async function dbOpen(){
+  if (!(await sqlite.isSecretStored()).result) {   // first run: make a random key; the plugin keeps it in Android's encrypted preferences
+    const k = crypto.getRandomValues(new Uint8Array(32));
+    await sqlite.setEncryptionSecret({ passphrase: [...k].map(b => b.toString(16).padStart(2, "0")).join("") });
+  }
+  await sqlite.createConnection({ database: DB, version: 1, encrypted: true, mode: "secret", readonly: false });
+  await sqlite.open({ database: DB, readonly: false });
+  await sqlite.execute({ database: DB, transaction: true, readonly: false, statements:
+    `CREATE TABLE IF NOT EXISTS tx (id TEXT PRIMARY KEY NOT NULL, bank TEXT NOT NULL, acct TEXT NOT NULL, date TEXT NOT NULL, narration TEXT NOT NULL,
+       amt REAL NOT NULL, dir TEXT NOT NULL, bal REAL, file TEXT, cat TEXT, ok INTEGER NOT NULL DEFAULT 0);
+     CREATE INDEX IF NOT EXISTS tx_date ON tx(date);
+     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY NOT NULL, v TEXT NOT NULL);` });
+}
+async function dbLoad(){
+  const q = async (statement) => (await sqlite.query({ database: DB, statement, values: [], readonly: false })).values || [];
+  const rows = (await q("SELECT * FROM tx ORDER BY date, rowid")).filter(r => r.id);
+  const kv = {}; (await q("SELECT k, v FROM kv")).forEach(r => { if (r.k) kv[r.k] = r.v; });
+  return { rows: rows.map(r => ({ id: r.id, bank: r.bank, acct: r.acct, date: r.date, desc: r.narration, amt: r.amt, dir: r.dir, bal: r.bal, file: r.file, cat: r.cat || "", catSrc: r.cat ? "you" : "", ...(r.ok ? { ok: true } : {}) })), kv };
+}
+// Writes only what changed since the last save
+function dbPersist(){
+  const set = [], seen = new Set();
+  for (const t of TX) {
+    seen.add(t.id); const sig = rowSig(t), old = savedRows.get(t.id);
+    if (old === undefined) set.push({ statement: "INSERT OR IGNORE INTO tx (id, bank, acct, date, narration, amt, dir, bal, file, cat, ok) VALUES (?,?,?,?,?,?,?,?,?,?,?)", values: [t.id, t.bank, t.acct, t.date, t.desc, t.amt, t.dir, t.bal, t.file || "", t.catSrc === "you" ? t.cat : "", t.ok ? 1 : 0] });
+    else if (old !== sig) set.push({ statement: "UPDATE tx SET cat = ?, ok = ? WHERE id = ?", values: [t.catSrc === "you" ? t.cat : "", t.ok ? 1 : 0, t.id] });
+    savedRows.set(t.id, sig);
+  }
+  for (const id of [...savedRows.keys()]) if (!seen.has(id)) { set.push({ statement: "DELETE FROM tx WHERE id = ?", values: [id] }); savedRows.delete(id); }
+  for (const [k, v] of Object.entries({ rules: JSON.stringify(RULES), settings: JSON.stringify(SET), imports: JSON.stringify(IMPORTS) }))
+    if (savedKV[k] !== v) { set.push({ statement: "INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", values: [k, v] }); savedKV[k] = v; }
+  for (let i = 0; i < set.length; i += 250) { const part = set.slice(i, i + 250);
+    dbQueue = dbQueue.then(() => sqlite.executeSet({ database: DB, set: part, transaction: true, readonly: false })).catch(e => { console.error("db", e); notify("Couldn't save to the database: " + (e.message || e)); }); }
+}
+async function bootDatabase(){
+  await dbOpen();
+  const { rows, kv } = await dbLoad();
+  const parse = (k, d) => { try { return kv[k] ? JSON.parse(kv[k]) : d; } catch { return d; } };
+  if (rows.length || kv.settings) {
+    TX = rows; RULES = parse("rules", {}); IMPORTS = parse("imports", []); SET = Object.assign({ me: "", family: "", small: 200, lock: false }, parse("settings", {}));
+    rows.forEach(t => savedRows.set(t.id, rowSig(t))); savedKV = { rules: kv.rules, settings: kv.settings, imports: kv.imports };
+  }
+  persist = dbPersist;       // from here on, saving goes to the database
+  if (!rows.length && TX.length) { dbPersist(); await dbQueue; }   // one-time move from the old browser storage
+  ["tx", "rules", "settings", "imports"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} });
+}
+
+/* ---- App lock: fingerprint, face or the phone's own PIN/pattern ---- */
+const bio = plugin("BiometricAuthNative");
+let locked = false, authBusy = false, awaySince = 0;
+function lockScreen(){
+  if (locked) return; locked = true;
+  const el = document.createElement("div"); el.id = "lock"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
+  el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"/></svg><b>Fintrack is locked</b><span id="lockMsg">Use your fingerprint or the phone's screen lock.</span><button class="btn primary" id="lockBtn">Unlock</button>`;
+  document.body.append(el);
+  el.querySelector("#lockBtn").onclick = tryUnlock;
+  tryUnlock();
+}
+async function tryUnlock(){
+  if (authBusy || !locked) return; authBusy = true;
+  const m0 = document.getElementById("lockMsg"); if (m0) m0.textContent = "Use your fingerprint or the phone's screen lock.";
+  try {
+    await bio.internalAuthenticate({ reason: "Unlock Fintrack", androidTitle: "Unlock Fintrack", androidSubtitle: "Your money data stays on this phone", allowDeviceCredential: true, androidConfirmationRequired: false });
+    locked = false; awaySince = 0; document.getElementById("lock")?.remove();
+  } catch (e) { const m = document.getElementById("lockMsg"); if (m) m.textContent = "Not unlocked. Tap Unlock to try again."; }
+  finally { authBusy = false; }
+}
+async function canLock(){ if (!bio) return false; try { const r = await bio.checkBiometry(); return !!(r.isAvailable || r.deviceIsSecure); } catch { return false; } }
+
 // Saved PDF passwords live in the Android Keystore (encrypted), not in plain app storage.
 async function loadSecurePw(){
   const ss = plugin("SecureStorage"); if (!ss) return;
@@ -623,6 +706,12 @@ function Settings(){
     <section class="card"><h2>What you taught it</h2>${Object.keys(RULES).length ? Object.entries(RULES).map(([k, c]) => `<div class="sechead"><span>${esc(TX.find(t => pkey(t.payee) === k)?.payee || k)} → <b>${esc(c)}</b></span><button class="btn small danger" data-rule="${esc(k)}">Remove</button></div>`).join("") : '<span class="muted">Tap any transaction to change its category. It remembers for next time.</span>'}</section>
     <section class="card"><h2>Saved PDF passwords</h2><span class="muted">Tried automatically on new statements. ${NATIVE ? "Kept encrypted in this phone's keystore." : "Stored only on this device."}</span>
       ${PW.length ? PW.map((p, i) => `<div class="sechead"><span>${esc(p.label || "Statement")} <span class="muted num">••••${esc(String(p.pw).slice(-2))}</span></span><button class="btn small danger" data-pw="${i}">Forget</button></div>`).join("") : '<span class="muted">None saved.</span>'}</section>
+    ${NATIVE ? `<section class="card"><div class="sechead"><h2>App lock</h2><span class="tag ${SET.lock ? "ok" : ""}">${SET.lock ? "On" : "Off"}</span></div>
+      <span class="muted">Ask for your fingerprint or the phone's screen lock when Fintrack opens, and again after 30 seconds in the background.</span>
+      <div class="btns" style="justify-content:flex-start"><button class="btn ${SET.lock ? "" : "primary"}" id="lockToggle">${SET.lock ? "Turn off app lock" : "Turn on app lock"}</button></div>
+      <span class="muted" id="lockNote"></span></section>` : ""}
+    <section class="card"><h2>Where your data is kept</h2>
+      <span class="muted">${NATIVE ? "Transactions, categories and settings are in an encrypted database inside this app. Saved PDF passwords are in the phone's keystore. Statement PDFs are read and not kept." : "In this browser's storage on this device. The Android app uses an encrypted database instead."} Nothing is uploaded. Uninstalling the app deletes it all, so keep a backup.</span></section>
     <section class="card"><h2>Back up and restore</h2>
       <span class="muted">A backup is one file with all ${TX.length} transactions, the categories you set and what you taught the app. Keep it somewhere safe (Drive, email to yourself). If this phone or the app's data is lost, restore from it.</span>
       <label class="check"><input type="checkbox" id="bkPw"> Include saved PDF passwords in the backup</label>
@@ -631,6 +720,13 @@ function Settings(){
       <span class="muted" id="bkNote">Restoring adds what is missing. It never deletes or overwrites what is already here.</span></section>
     <section class="card"><h2>Your data</h2><div class="btns" style="justify-content:flex-start"><button class="btn" id="csv">Download CSV (for Excel)</button><button class="btn danger" id="wipe">Delete everything</button></div>
       <span class="muted">Everything is kept on this device. Nothing is uploaded.</span></section>`);
+  const lt = $("#lockToggle");
+  if (lt) lt.onclick = async () => {
+    if (!SET.lock && !(await canLock())) { $("#lockNote").innerHTML = '<span style="color:var(--warn)">Set a screen lock (PIN, pattern or fingerprint) in the phone\'s settings first.</span>'; return; }
+    try { authBusy = true; await bio.internalAuthenticate({ reason: SET.lock ? "Turn off app lock" : "Turn on app lock", androidTitle: SET.lock ? "Turn off app lock" : "Turn on app lock", allowDeviceCredential: true, androidConfirmationRequired: false }); }
+    catch { authBusy = false; $("#lockNote").textContent = "Not changed."; return; }
+    authBusy = false; awaySince = 0; SET.lock = !SET.lock; save(); toast(SET.lock ? "App lock is on." : "App lock is off."); go("settings");
+  };
   $("#bkSave").onclick = () => {
     saveFile(`fintrack-backup-${today()}.json`, JSON.stringify(makeBackup($("#bkPw").checked)), "application/json")
       .then(how => { store.set("lastBackup", today()); toast(how === "shared" ? "Backup ready. Choose where to keep it." : "Backup saved to your downloads."); })
@@ -652,7 +748,7 @@ function Settings(){
     saveFile(`fintrack-${today()}.csv`, "\ufeff" + csv, "text/csv").catch(e => { if (!/cancel/i.test(e.message || "")) toast("Couldn't save the file: " + (e.message || e)); });
   };
   $("#wipe").onclick = () => sheet(`<h3>Delete all data?</h3><p class="muted">This removes ${TX.length} transactions, your categories and saved passwords from this device. It can't be undone.</p><div class="btns"><button class="btn" data-close>Keep</button><button class="btn primary" id="yes" style="background:var(--bad);border-color:var(--bad)">Delete everything</button></div>`,
-    r => r.querySelector("#yes").onclick = () => { TX = []; PW = []; savePw(); RULES = {}; IMPORTS = []; ["tx","pw","rules","imports"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} }); closeSheet(); go("home"); toast("All data deleted."); });
+    r => r.querySelector("#yes").onclick = () => { TX = []; PW = []; savePw(); RULES = {}; IMPORTS = []; ["tx","pw","rules","imports"].forEach(k => { try { localStorage.removeItem("ft_" + k); } catch {} }); save(); closeSheet(); go("home"); toast("All data deleted."); });
 }
 
 /* ================= sheet + password prompt ================= */
@@ -689,13 +785,19 @@ document.querySelector("nav.tabs").onclick = e => { const b = e.target.closest("
 $("#fab").onclick = () => go("add");
 $("#backBtn").onclick = () => go(current === "recurring" ? "settings" : "home");
 window.PL = { importBuffer, detectRecurring, get TX(){ return TX; } };
-recategoriseAll();
-go(TX.length ? "home" : "add");
-loadSecurePw();
+function startApp(){ recategoriseAll(); go(TX.length ? "home" : "add"); loadSecurePw(); cleanTempFiles(); if (SET.lock && bio) lockScreen(); }
+if (sqlite) bootDatabase().catch(e => { console.error("db boot", e); notify("The database couldn't be opened, so this session uses temporary storage: " + (e.message || e)); }).then(startApp);
+else startApp();
 try { const sb = plugin("SystemBars"); if (sb) sb.setStyle({ style: "DARK" }); } catch {}
 // Android back button: close an open sheet, else go back to Spends, else leave the app
 const appPlugin = plugin("App");
-if (appPlugin) appPlugin.addListener("backButton", () => { if (sheetEl) { sheetEl.dispatchEvent(new Event("cancel")); closeSheet(); } else if (current !== "home" && TX.length) go(current === "recurring" ? "settings" : "home"); else appPlugin.exitApp(); });
+// Lock again after the app has been in the background for 30 seconds
+if (appPlugin) appPlugin.addListener("appStateChange", st => {
+  if (authBusy) return;
+  if (!st.isActive) awaySince = Date.now();
+  else if (SET.lock && bio && awaySince && Date.now() - awaySince > 30000) lockScreen();
+});
+if (appPlugin) appPlugin.addListener("backButton", () => { if (locked) return appPlugin.exitApp(); if (sheetEl) { sheetEl.dispatchEvent(new Event("cancel")); closeSheet(); } else if (current !== "home" && TX.length) go(current === "recurring" ? "settings" : "home"); else appPlugin.exitApp(); });
 </script>
 </body>
 </html>
