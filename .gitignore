@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+*.log
+# bank statements and backups must never be committed
+*.pdf
+fintrack-backup-*.json
+paisa-ledger-backup-*.json
+*.csv
+*.xlsx
+_test/

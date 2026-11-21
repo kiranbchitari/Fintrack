@@ -1,0 +1,9 @@
+{
+  "appId": "com.kiranbchitari.fintrack",
+  "appName": "Fintrack",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f8f9fb"
+  }
+}
