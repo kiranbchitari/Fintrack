@@ -177,6 +177,31 @@ check("A file that isn't a backup is refused", /isn't a Fintrack backup/.test(th
 threw = ""; try { restoreBackup({ app: "fintrack", tx: [{ id: "x", date: "bad", amt: "1", dir: "out", desc: "" }] }); } catch (e) { threw = e.message; }
 check("A damaged backup changes nothing", /damaged/.test(threw) && TX.length === 3, threw);
 
+
+group = "Monthly commitments";
+reset();
+{
+  const rows2 = [], mm = ["01","02","03","04","05","06","07","08","09","10","11"];
+  mm.forEach((m, i) => {
+    const old = i < 9;   // from October the bank prints a different collector name for the same mandates
+    rows2.push(row(`2026-${m}-01`, old ? "ACH-DR-Indian Clearing Corp- 0000AAA" + i : "ACH-DR-GROWW INVEST TECH PR- WOWF" + i + "-UTIB70", 20000, "out"));
+    rows2.push(row(`2026-${m}-15`, old ? "ACH-DR-Indian Clearing Corp- 0000BBB" + i : "ACH-DR-GROWW INVEST TECH PR- P2KF" + i + "-UTIB70", 30000, "out"));
+    if (i >= 5) rows2.push(row(`2026-${m}-${i === 7 ? "17" : "15"}`, old ? "ACH-DR-Indian Clearing Corp- 0000CCC" + i : "ACH-DR-GROWW INVEST TECH PR- Q217" + i + "-UTIB70", 20000, "out"));
+    rows2.push(row(`2026-${m}-25`, "DEBIT ACHDr NACH00000000012345 CTRAZORPAY", 933, "out"));
+    rows2.push(row(`2026-${m}-${String(12 + (i % 6)).padStart(2, "0")}`, "UPI/P2M/77/CRED Club /paymen/AXIS BANK", [58, 2900, 6500, 80819, 1700, 4200][i % 6], "out"));
+    rows2.push(row(`2026-${m}-20`, "UPI/P2A/88/MEENA SHARMA /UPI/UNION BANK", 15000, "out"));
+  });
+  addStatement({ bank: "Axis", acct: "1111", rows: rows2.sort((a, b) => a.date < b.date ? -1 : 1) }, "commit");
+  const rc = detectRecurring(), sips = rc.filter(x => x.cat === "Investments");
+  check("A SIP keeps going when the bank renames the collector (not 'stopped')", sips.length === 3 && sips.every(x => x.active), sips.map(x => `${x.payee} ${x.typ} ${x.active ? "active" : "stopped"} n=${x.n}`).join("; "));
+  check("Same-amount SIPs on the 1st and the 15th are two commitments", sips.filter(x => x.typ === 20000).length === 2 && sips.filter(x => x.typ === 20000).every(x => x.fixed), sips.map(x => x.typ + (x.fixed ? " fixed" : " varies")).join("; "));
+  check("A SIP date that slips by two days (15th to 17th) is still the same SIP", sips.some(x => x.typ === 20000 && x.n === 6), sips.map(x => x.typ + " n=" + x.n).join("; "));
+  const cm = commitments();
+  check("Monthly commitments = 20k + 30k + 20k SIPs + 933 insurance", Math.round(cm.fixed) === 70933, "fixed " + cm.fixed + " from " + cm.fixedItems.map(x => x.payee + " " + x.monthly).join(", "));
+  check("A card bill that swings from 58 to 80,819 is not a fixed commitment", cm.variableItems.length === 1 && /cred/i.test(cm.variableItems[0].payee), cm.variableItems.map(x => x.payee).join(", "));
+  check("Regular money to a person is not counted as a commitment", ![...cm.fixedItems, ...cm.variableItems].some(x => /meena/i.test(x.payee)), "included");
+}
+
 /* ---------- results ---------- */
 const failed = results.filter(r => !r.pass).length;
 const TEST_RESULTS = { total: results.length, failed, failures: results.filter(r => !r.pass) };

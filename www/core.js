@@ -405,13 +405,25 @@ function addStatement(st, name){
 const FREQ = [["Weekly",7,2],["Every 2 weeks",14,3],["Monthly",30,7],["Every 2 months",61,10],["Quarterly",91,14],["Every 6 months",182,20],["Yearly",365,25]];
 const BILLISH = ["Credit card bills","Bills & recharges","Insurance","Subscriptions","Loan EMI","Rent & housing","Investments","Salary","Interest & dividends","Family","Education","Investment returns"];
 function detectRecurring(){
-  const groups = {};
+  const groups = {}, mandates = [];
   for (const t of TX) {
     if (t.cat === "Own accounts") continue;
-    const mand = t.channel === "Auto-debit";
-    const key = [t.dir, mand ? "M" : "", pkey(t.payee), mand ? Math.round(t.amt / 500) : ""].join("|");
+    if (t.channel === "Auto-debit") { mandates.push(t); continue; }
+    const key = [t.dir, pkey(t.payee)].join("|");
     (groups[key] = groups[key] || []).push(t);
   }
+  // Auto-debits are matched by what they are (category), how much, and which day of the month, not by the name the
+  // bank prints. Banks rename the collector ("Indian Clearing Corp" becomes "Groww Invest Tech") while the mandate
+  // carries on, and two SIPs of the same amount on the 1st and the 15th are two separate commitments.
+  const domNear = (a, b) => { const d = Math.abs(a - b); return Math.min(d, 31 - d) <= 4; };
+  const clusters = [];
+  for (const t of mandates) {
+    const dom = +t.date.slice(8);
+    let c = clusters.find(c => c.dir === t.dir && c.cat === t.cat && Math.abs(c.amt - t.amt) <= c.amt * 0.02 && domNear(c.dom, dom));
+    if (!c) clusters.push(c = { dir: t.dir, cat: t.cat, amt: t.amt, dom, tx: [] });
+    c.tx.push(t);
+  }
+  clusters.forEach((c, i) => groups["M|" + i] = c.tx);
   const lastDate = TX.length ? TX[TX.length - 1].date : null;
   const mIndex = d => +d.slice(0, 4) * 12 + +d.slice(5, 7) - 1;
   const res = [];
@@ -433,7 +445,8 @@ function detectRecurring(){
       if (ff && gaps.filter(x => Math.abs(x - ff[1]) <= ff[2] * 1.6).length / gaps.length >= .7 && (billish || fixedD)) f = ff;
     }
     if (!f) continue;
-    const typ = median(amts), fixed = Math.max(...amts) / Math.min(...amts) <= 1.12;
+    // "usual" amount comes from the last three payments, so a change shows up quickly
+    const recent = amts.slice(-6), typ = median(amts.slice(-3)), fixed = Math.max(...recent) / Math.min(...recent) <= 1.12;
     if (!fixed && !billish && typ < 1000) continue;
     const last = dates[dates.length - 1];
     const dom = Math.round(median(dates.map(d => +d.slice(8))));
@@ -527,4 +540,14 @@ function restoreBackup(b){
   if (added) IMPORTS.push({ name: "Backup from " + (b.exported || "?"), bank: "Backup", acct: "", added, dup: skipped, at: today() });
   recategoriseAll();
   return { added, skipped, rules, passwords: pws };
+}
+
+// What you are signed up to pay every month.
+// fixed    = auto-debits and same-amount payments (SIPs, insurance, subscriptions, rent, EMIs)
+// variable = regular bills whose amount changes (card bills, recharges): shown as "usually about", not a commitment
+// Regular transfers to family and friends are left out of both.
+function commitments(){
+  const outs = detectRecurring().filter(r => r.active && r.dir === "out" && !["family", "people"].includes((CATS[r.cat] || [])[0]));
+  const fixed = outs.filter(r => r.fixed), variable = outs.filter(r => !r.fixed), sum = l => l.reduce((a, r) => a + r.monthly, 0);
+  return { fixed: sum(fixed), variable: sum(variable), fixedItems: fixed, variableItems: variable };
 }

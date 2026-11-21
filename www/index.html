@@ -585,11 +585,13 @@ function Recurring(){
   const sip = outs.filter(r => CATS[r.cat]?.[0] === "invest");
   const ppl = outs.filter(r => ["family", "people"].includes(CATS[r.cat]?.[0]));
   const bills = outs.filter(r => !auto.includes(r) && !sip.includes(r) && !ppl.includes(r));
-  const freq = frequentPlaces();
+  const freq = frequentPlaces(), cmt = commitments();
   const groups = [["auto", "Auto-debits", auto], ["bills", "Bills", bills], ["sip", "Investments", sip], ["ppl", "People", ppl], ["in", "Coming in", ins]].filter(g => g[2].length);
   S(`<div class="chips" id="recChips"><button class="chipbtn" data-r="" aria-pressed="${!recFilter}">All</button>${groups.map(([k, l]) => `<button class="chipbtn" data-r="${k}" aria-pressed="${recFilter === k}">${l}</button>`).join("")}</div>
     <section class="card hero"><div class="commit"><svg viewBox="0 0 24 24"><path d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
-      <div><span class="lbl">Monthly commitments</span><div class="big">${inr(sum(outs))}</div></div><span class="pillx">${outs.filter(r => r.active).length} active</span></div></section>
+      <div><span class="lbl">Monthly commitments</span><div class="big">${inr(cmt.fixed)}</div></div><span class="pillx">${cmt.fixedItems.length} active</span></div>
+      <span class="lbl" style="opacity:.9">${cmt.fixedItems.length ? cmt.fixedItems.map(r => `${esc(r.payee)} ${inr(r.monthly)}`).join(" + ") : "No fixed monthly payments found yet."}</span>
+      ${cmt.variable ? `<span class="lbl" style="opacity:.9">Bills that change each month (${cmt.variableItems.map(r => esc(r.payee)).join(", ")}) usually add about ${inr(cmt.variable)}. Money you send to people is not counted.</span>` : ""}</section>
     ${sect("auto", "Auto-debits", auto, "taken by mandate (NACH/ACH)")}
     ${sect("bills", "Bills & subscriptions", bills, `${inr(sum(bills))}/month`)}
     ${sect("sip", "Investments (SIPs)", sip, `${inr(sum(sip))}/month`)}
