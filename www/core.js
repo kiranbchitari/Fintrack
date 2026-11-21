@@ -168,7 +168,7 @@ function categorise(t){
 }
 const needsCheck = t => t.conf === "low" && !t.ok;
 // Money that left one of your accounts and arrived in another (same amount, within 3 days)
-const OWN = { surname: "" };
+const OWN = { surname: "", first: "" };
 function matchOwnTransfers(){
   const outs = TX.filter(t => t.dir === "out" && t.kind !== "shop"), ins = TX.filter(t => t.dir === "in" && t.kind !== "shop");
   TX.forEach(t => t.selfMatch = false);
@@ -183,6 +183,7 @@ function matchOwnTransfers(){
   // your surname = last word of your own name as it appears in your own transfers; used to spot family
   const mine = TX.filter(t => t.selfMatch).map(t => t.payee.toLowerCase().split(/[^a-z]+/).filter(Boolean)).filter(w => w.length >= 2).sort((a, b) => b.join("").length - a.join("").length)[0];
   OWN.surname = mine && mine[mine.length - 1].length >= 4 ? mine[mine.length - 1] : "";
+  OWN.first = mine && mine[0].length >= 3 ? mine[0][0].toUpperCase() + mine[0].slice(1) : "";
 }
 // Banks cut names short ("RATNA B", "SNEHAL JA"). If a short name is the start of exactly one longer name, they are the same payee.
 function mergeNames(){

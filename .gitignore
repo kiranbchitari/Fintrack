@@ -8,3 +8,10 @@ paisa-ledger-backup-*.json
 *.csv
 *.xlsx
 _test/
+
+# copies of the earlier one-off report (contain real bank data) and the old prototype
+/Money-Map-2026.*
+/app/
+/categorise.py
+/make_outputs.py
+/report-template.html
