@@ -2,7 +2,7 @@
 const results = [];
 let group = "";
 function check(name, cond, detail){ results.push({ group, name, pass: !!cond, detail: cond ? "" : detail }); }
-function reset(){ TX.length = 0; RULES = {}; NAMES = {}; SET = { me: "", family: "", small: 200 }; IMPORTS.length = 0; }
+function reset(){ TX.length = 0; RULES = {}; NAMES = {}; SET = Object.assign({}, SET_DEFAULTS); IMPORTS.length = 0; }
 const row = (date, desc, amt, dir, bal = null) => ({ date, desc, amt, dir, bal });
 function one(desc, dir, amt, bank = "Axis"){ reset(); addStatement({ bank, acct: "1111", rows: [row("2026-03-10", desc, amt, dir, 1000)] }, "t"); return TX[0]; }
 function expectCat(label, desc, dir, amt, cat, extra = {}, bank){
@@ -223,6 +223,26 @@ reset(); restoreBackup(bk2);
 check("Your names survive backup and restore", TX.filter(t => /RAZORPAY/.test(t.desc)).every(t => t.payee === "Term insurance"), TX.map(t => t.payee).join(" | "));
 renamePayee(TX[0], "");
 check("Clearing the name goes back to the bank's name", TX[0].payee === "Razorpay" && !Object.keys(NAMES).length, TX[0].payee);
+
+
+group = "Reviewing many payments at once";
+reset();
+addStatement({ bank: "Axis", acct: "1111", rows: [
+  row("2026-06-06", "UPI/P2A/1/RAVI KUMAR /Paymen/ICICI Bank", 50000, "out", 900000), row("2026-06-08", "UPI/P2A/2/RAVI KUM/ICIC/Payment/", 50000, "in", 950000),
+  row("2026-06-09", "UPI/P2A/3/ANIL VERMA /Paymen/ICICI Bank", 25000, "out", 925000), row("2026-06-10", "UPI/P2M/4/SOME BIG SHOP /UPI/YES BANK", 4000, "out", 921000),
+  row("2026-06-11", "UPI/P2M/5/ZOMATO LIMITED /UPI/AXIS BANK", 300, "out", 920700) ] }, "b");
+const toCheck = TX.filter(needsCheck);
+check("Four of the five payments are waiting for a check", toCheck.length === 4, toCheck.map(x => x.payee).join(", "));
+let br = bulkReview(toCheck.slice(0, 2).map(x => x.id));
+check("'Looks right' on two selected payments clears exactly those two", br.done === 2 && TX.filter(needsCheck).length === 2, JSON.stringify(br) + " left " + TX.filter(needsCheck).length);
+br = bulkReview(TX.filter(needsCheck).map(x => x.id), "Shopping");
+check("Setting a category in bulk applies it and clears the list", br.done === 2 && br.skipped === 0 && TX.filter(needsCheck).length === 0 && TX.filter(x => x.cat === "Shopping" && x.catSrc === "you").length === 2, JSON.stringify(br));
+br = bulkReview(TX.map(x => x.id), "Salary");
+check("An income category is not forced onto payments going out", br.done === 1 && br.skipped === 4 && TX.find(x => x.dir === "in").cat === "Salary", JSON.stringify(br));
+const bk3 = JSON.parse(JSON.stringify(makeBackup(false))); reset(); restoreBackup(bk3);
+check("Bulk choices survive backup and restore", TX.filter(needsCheck).length === 0 && TX.filter(x => x.cat === "Shopping").length === 2, TX.map(x => x.cat).join(", "));
+reset(); SET.theme = ""; restoreBackup({ app: "fintrack", tx: [], settings: { theme: "light", name: "Asha", dp: "javascript:alert(1)" } });
+check("Restore brings back theme and name, and refuses a picture that isn't an image", SET.theme === "light" && SET.name === "Asha" && SET.dp === "", JSON.stringify({ t: SET.theme, n: SET.name, d: SET.dp }));
 
 /* ---------- results ---------- */
 const failed = results.filter(r => !r.pass).length;

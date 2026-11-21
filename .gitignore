@@ -19,3 +19,6 @@ _test/
 # built app files
 *.apk
 /dist/
+
+# local editor/preview settings
+.claude/

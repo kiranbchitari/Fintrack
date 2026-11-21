@@ -14,12 +14,43 @@
 @font-face{font-family:"Space Grotesk";font-weight:700;font-display:swap;src:url(fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
 /* Layout: a phone-width app shell (max 480px), header + scrolling screen + bottom tab bar */
 :root{
-  /* Dark-only look: near-black violet surfaces, one purple accent, green for money in */
-  --bg:#07060c; --app:#0c0a14; --surface:#15121f; --surface-2:#1d1930; --line:#272339; --ink:#f4f2fa; --ink-2:#bdb8cc; --ink-3:#8b859c;
-  --accent:#8b5cf6; --accent-2:#b79dff; --accent-ink:#ffffff; --accent-soft:#1c1633;
-  --in:#34d27b; --warn:#f0b24a; --bad:#f2617a; --warn-bg:#2a2012; --bad-bg:#2c141b; --good-bg:#11261b;
-  --s-in:#34d27b; --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* Midnight (default): near-black violet surfaces, purple accent, green for money in.
+     Other themes below only swap these tokens; nothing else in the stylesheet names a colour for surfaces or text. */
+  --bg:#07060c; --app:#0c0a14; --surface:#15121f; --surface-2:#1d1930; --card-b:#120f1c; --line:#272339; --edge:#3a3550; --nav:#110e1b;
+  --ink:#f4f2fa; --ink-2:#bdb8cc; --ink-3:#8b859c;
+  --accent:#8b5cf6; --accent-2:#b79dff; --accent-ink:#ffffff; --accent-soft:#1c1633; --glow:rgba(139,92,246,.30); --me-b:#4a2fa8;
+  --hero:linear-gradient(120deg,#4a2fa8,#2a1d5e 55%,#191335); --hero-edge:#4a3a8a; --hero-ink:#ffffff; --bar-a:#3a3550; --bar-b:#221f31;
+  --in:#34d27b; --warn:#f0b24a; --bad:#f2617a; --warn-bg:#2a2012; --bad-bg:#2c141b; --good-bg:#11261b; --s-in:#34d27b;
+  --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:dark;
+}
+:root[data-theme="ocean"]{
+  --bg:#050a10; --app:#08111b; --surface:#0f1c2b; --surface-2:#15263a; --card-b:#0b1622; --line:#1e3349; --edge:#2a4660; --nav:#0a1420;
+  --ink:#eef5fb; --ink-2:#b3c4d6; --ink-3:#7f93a8;
+  --accent:#22b8cf; --accent-2:#67d8ea; --accent-ink:#04141a; --accent-soft:#0f2836; --glow:rgba(34,184,207,.26); --me-b:#0e6f86;
+  --hero:linear-gradient(120deg,#0e6f86,#0c4a63 55%,#0a2a40); --hero-edge:#1f7f96; --bar-a:#2a4660; --bar-b:#152a3c;
+}
+:root[data-theme="sunset"]{
+  --bg:#0d0807; --app:#140c0a; --surface:#1f1512; --surface-2:#2b1d18; --card-b:#1a110e; --line:#3a2822; --edge:#523a31; --nav:#170e0b;
+  --ink:#fbf3ef; --ink-2:#d3c0b8; --ink-3:#a08a80;
+  --accent:#ff7a59; --accent-2:#ffb199; --accent-ink:#1a0a05; --accent-soft:#2e1a13; --glow:rgba(255,122,89,.26); --me-b:#b4432a;
+  --hero:linear-gradient(120deg,#b4432a,#7a2c1d 55%,#3d1710); --hero-edge:#c2573d; --bar-a:#523a31; --bar-b:#2b1d18;
+}
+:root[data-theme="light"]{
+  --bg:#e9e7f1; --app:#f6f5fb; --surface:#ffffff; --surface-2:#f1eff9; --card-b:#ffffff; --line:#e4e1ee; --edge:#d2cde3; --nav:#ffffff;
+  --ink:#17141f; --ink-2:#4d475c; --ink-3:#777189;
+  --accent:#6d3ff0; --accent-2:#6d3ff0; --accent-ink:#ffffff; --accent-soft:#efeafd; --glow:rgba(109,63,240,.16); --me-b:#4a2fa8;
+  --hero:linear-gradient(120deg,#7c4dff,#5b34d6 55%,#4527a8); --hero-edge:#7c4dff; --bar-a:#d5d0e8; --bar-b:#e6e3f2;
+  --in:#0f8a4a; --warn:#a86400; --bad:#c2334d; --warn-bg:#fdf3e2; --bad-bg:#fbe9ee; --good-bg:#e7f5ec; --s-in:#1baf7a;
+  color-scheme:light;
+}
+:root[data-theme="mint"]{
+  --bg:#e4efe9; --app:#f3f8f5; --surface:#ffffff; --surface-2:#eaf3ee; --card-b:#ffffff; --line:#dbe7e0; --edge:#c3d6cb; --nav:#ffffff;
+  --ink:#10201a; --ink-2:#40554b; --ink-3:#6b7f75;
+  --accent:#0e7c66; --accent-2:#0e7c66; --accent-ink:#ffffff; --accent-soft:#e0f1ec; --glow:rgba(14,124,102,.16); --me-b:#0a5b4b;
+  --hero:linear-gradient(120deg,#12957b,#0e7c66 55%,#0a5b4b); --hero-edge:#12957b; --bar-a:#c9dcd2; --bar-b:#dfece5;
+  --in:#1a7f37; --warn:#a86400; --bad:#c2334d; --warn-bg:#fdf3e2; --bad-bg:#fbe9ee; --good-bg:#e3f3e8; --s-in:#3aa655;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -32,25 +63,28 @@ button{font:inherit;color:inherit}
 .top h1{font:600 1.2rem var(--display);margin:0}
 .top .sub{font-size:.78rem;color:var(--ink-3)}
 main{flex:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 96px max(16px,env(safe-area-inset-left,0px));display:grid;gap:16px;align-content:start}
-nav.tabs{position:sticky;bottom:0;z-index:10;background:#110e1b;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px max(4px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px))}
+nav.tabs{position:sticky;bottom:0;z-index:10;background:var(--nav);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px max(4px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px))}
 .tab{border:0;background:none;display:grid;justify-items:center;gap:2px;padding:6px 0;font-size:.7rem;color:var(--ink-3);cursor:pointer;border-radius:10px}
 .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tab[aria-current="page"]{color:var(--ink);font-weight:600}
-.fab{width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;justify-self:center;align-self:center;cursor:pointer;box-shadow:0 0 0 4px rgba(139,92,246,.18)}
-.fab svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round}
+.fab{width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;justify-self:center;align-self:center;cursor:pointer;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.fab svg{width:22px;height:22px;stroke:var(--accent-ink);fill:none;stroke-width:2.2;stroke-linecap:round}
 .fab:focus-visible,.iconbtn:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
-.app{background:radial-gradient(120% 34% at 85% 0%,rgba(139,92,246,.30),transparent 62%),var(--app) !important}
+.app{background:radial-gradient(120% 34% at 85% 0%,var(--glow),transparent 62%),var(--app) !important}
 .top{background:transparent !important;border-bottom:0 !important;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .top .l{display:flex;align-items:center;gap:10px;min-width:0}
 .iconbtn{width:36px;height:36px;border-radius:50%;border:0;background:none;color:var(--ink);display:grid;place-items:center;cursor:pointer;flex:none}
 .iconbtn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.me{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#4a2fa8);display:grid;place-items:center;font:600 .95rem var(--display);color:#fff;flex:none}
+.me{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--me-b));display:grid;place-items:center;font:600 .95rem var(--display);color:#fff;flex:none;border:0;padding:0;overflow:hidden;cursor:pointer}
+.me img{width:100%;height:100%;object-fit:cover;display:block}
+.me.big{width:96px;height:96px;font-size:2.2rem;cursor:default}
+.me:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
 .bigamt{font:600 2.1rem/1.1 var(--display);font-variant-numeric:tabular-nums}
 .sphead{display:grid;gap:6px}
 .sphead .rowx{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
 .mbars{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;align-items:end;height:92px;margin-top:8px}
 .mbar{border:0;background:none;padding:0;display:grid;grid-template-rows:1fr auto;gap:6px;height:100%;cursor:pointer;color:var(--ink-3);font:500 .68rem var(--body)}
-.mbar i{align-self:end;justify-self:center;width:78%;max-width:26px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#3a3550,#221f31)}
+.mbar i{align-self:end;justify-self:center;width:78%;max-width:26px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--bar-a),var(--bar-b))}
 .mbar[aria-pressed="true"]{color:var(--ink);font-weight:600}
 .mbar[aria-pressed="true"] i{background:linear-gradient(180deg,var(--accent-2),var(--accent))}
 .topcat{display:grid;grid-template-columns:44px 1fr auto;gap:4px 12px;align-items:center;border:0;background:none;padding:0;text-align:left;width:100%;cursor:pointer;color:inherit;font:inherit}
@@ -60,7 +94,7 @@ nav.tabs{position:sticky;bottom:0;z-index:10;background:#110e1b;border-top:1px s
 .topcat .sub{grid-column:2/4;display:grid;gap:5px;font-size:.76rem;color:var(--ink-3)}
 .topcat .trk{height:4px;background:var(--line);border-radius:3px;overflow:hidden} .topcat .trk i{display:block;height:100%;border-radius:3px}
 .tiles3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile3{background:linear-gradient(180deg,var(--surface),#120f1c);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:4px;min-width:0}
+.tile3{background:linear-gradient(180deg,var(--surface),var(--card-b));border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:4px;min-width:0}
 .tile3 svg{width:22px;height:22px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tile3 span{font-size:.78rem;color:var(--ink-2)} .tile3 b{font:600 .98rem var(--display);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .menu{display:grid}
@@ -72,9 +106,9 @@ nav.tabs{position:sticky;bottom:0;z-index:10;background:#110e1b;border-top:1px s
 .pillx{background:rgba(255,255,255,.14);border-radius:99px;padding:5px 12px;font-size:.8rem;white-space:nowrap}
 .tab:focus-visible,.btn:focus-visible,.row:focus-visible,input:focus-visible,select:focus-visible,.chipbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 h2{font:600 1.02rem var(--display);margin:0}
-.card{background:linear-gradient(180deg,var(--surface),#120f1c);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:12px;min-width:0}
-.hero{background:linear-gradient(120deg,#4a2fa8,#2a1d5e 55%,#191335);color:var(--accent-ink);border:1px solid #4a3a8a}
-.hero.plain{background:none;border:0;padding:4px 2px 0}
+.card{background:linear-gradient(180deg,var(--surface),var(--card-b));border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:12px;min-width:0}
+.hero{background:var(--hero);color:var(--hero-ink);border:1px solid var(--hero-edge)}
+.hero.plain{background:none;border:0;padding:4px 2px 0;color:var(--ink)}
 .hero .lbl{opacity:.85;font-size:.8rem}
 .hero .big{font:600 2rem/1.1 var(--display);font-variant-numeric:tabular-nums}
 .hero .accts{display:flex;gap:8px;flex-wrap:wrap}
@@ -89,7 +123,7 @@ h2{font:600 1.02rem var(--display);margin:0}
 .stat span{font-size:.78rem;color:var(--ink-3)}
 .delta{font-size:.76rem;font-weight:600}
 .delta.up{color:var(--bad)} .delta.down{color:var(--in)}
-.btn{border:1px solid #3a3550;background:var(--surface-2);border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:500}
+.btn{border:1px solid var(--edge);background:var(--surface-2);border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:500}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.danger{color:var(--bad)}
 .btn.small{padding:6px 10px;font-size:.82rem}
@@ -115,7 +149,7 @@ h2{font:600 1.02rem var(--display);margin:0}
 .row .a.in{color:var(--in)}
 .row .a small{display:block;font-weight:400;font-size:.72rem;color:var(--ink-3)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
-.chipbtn{border:1px solid #3a3550;background:transparent;color:var(--ink);border-radius:99px;padding:6px 12px;font-size:.8rem;white-space:nowrap;cursor:pointer}
+.chipbtn{border:1px solid var(--edge);background:transparent;color:var(--ink);border-radius:99px;padding:6px 12px;font-size:.8rem;white-space:nowrap;cursor:pointer}
 .chipbtn[aria-pressed="true"]{background:var(--ink);color:var(--app);border-color:var(--ink)}
 .tag{display:inline-block;font-size:.68rem;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
 .tag.warn{color:var(--warn);border-color:currentColor}.tag.ok{color:var(--in);border-color:currentColor}.tag.bad{color:var(--bad);border-color:currentColor}
@@ -196,11 +230,24 @@ button.ins:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wkc{display:grid;gap:4px;justify-items:center;font-size:.72rem;color:var(--ink-3)}
 .wkb{height:90px;width:100%;display:flex;align-items:flex-end;justify-content:center}
 .wkb i{display:block;width:60%;max-width:26px;background:var(--accent);border-radius:4px 4px 0 0}
-#lock{position:fixed;inset:0;z-index:100;background:radial-gradient(120% 40% at 50% 0%,rgba(139,92,246,.35),transparent 62%),var(--app);display:grid;place-content:center;justify-items:center;gap:12px;text-align:center;padding:24px}
+#lock{position:fixed;inset:0;z-index:100;background:radial-gradient(120% 40% at 50% 0%,var(--glow),transparent 62%),var(--app);display:grid;place-content:center;justify-items:center;gap:12px;text-align:center;padding:24px}
 #lock svg{width:56px;height:56px;stroke:var(--accent-2);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #lock b{font:600 1.3rem var(--display)} #lock span{color:var(--ink-2);max-width:260px}
 .rec.tap{cursor:pointer}
 .rec.tap:focus-visible{outline:2px solid var(--accent-2);outline-offset:-2px}
+.selrow{display:grid;grid-template-columns:44px 1fr;align-items:center;border-top:1px solid var(--line);background:var(--surface)}
+.daylbl+.selrow{border-top:0}
+.selrow .row{border-top:0;padding-left:0;background:none}
+.pick,#selAll{width:20px;height:20px;accent-color:var(--accent);justify-self:center;margin:0;cursor:pointer}
+.bulkhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.bulkact{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));width:min(448px,calc(100% - 24px));z-index:20;background:var(--surface-2);border:1px solid var(--edge);border-radius:16px;padding:10px 12px;display:flex;gap:8px;align-items:center;justify-content:space-between;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.bulkact b{font-weight:600;white-space:nowrap}
+.bulkact .btn{padding:8px 12px;font-size:.86rem}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px}
+.theme{border:2px solid var(--line);border-radius:14px;padding:8px;background:none;color:inherit;font:inherit;font-size:.8rem;display:grid;gap:6px;justify-items:center;cursor:pointer}
+.theme[aria-pressed="true"]{border-color:var(--accent)}
+.theme i{width:100%;height:44px;border-radius:9px;display:block;border:1px solid rgba(127,127,127,.25)}
+.profile{display:grid;justify-items:center;gap:10px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--app);padding:10px 16px;border-radius:10px;font-size:.86rem;z-index:50;max-width:90vw}
 </style>
 </head>
@@ -225,6 +272,54 @@ button.ins:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <script>
 "use strict";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+
+/* ================= look: themes and profile photo ================= */
+const THEMES = [["", "Midnight", "linear-gradient(135deg,#0c0a14 55%,#8b5cf6 55%)"], ["ocean", "Ocean", "linear-gradient(135deg,#08111b 55%,#22b8cf 55%)"], ["sunset", "Sunset", "linear-gradient(135deg,#140c0a 55%,#ff7a59 55%)"],
+  ["light", "Light", "linear-gradient(135deg,#f6f5fb 55%,#6d3ff0 55%)"], ["mint", "Mint", "linear-gradient(135deg,#f3f8f5 55%,#0e7c66 55%)"]];
+function applyTheme(name){
+  name = THEMES.some(t => t[0] === name) ? name : "";
+  if (name) document.documentElement.dataset.theme = name; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem("ft_theme", name); } catch {}   // only the theme name, so the right colours show before the database opens
+  const light = name === "light" || name === "mint";
+  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue("--app").trim();
+  try { const sb = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.SystemBars; if (sb && Capacitor.isNativePlatform()) sb.setStyle({ style: light ? "LIGHT" : "DARK" }); } catch {}
+}
+try { applyTheme(localStorage.getItem("ft_theme") || ""); } catch { applyTheme(""); }
+const myName = () => (SET.name || OWN.first || "").trim();
+const meHtml = (cls = "") => SET.dp ? `<img src="${esc(SET.dp)}" alt="">` : esc((myName() || "F")[0].toUpperCase());
+// Shrinks a chosen photo to a 256px square so it is small enough to keep in settings
+function photoToDataUrl(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const n = 256, c = document.createElement("canvas"); c.width = c.height = n;
+      const side = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
+      c.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, n, n); URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", 0.85)); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("That file isn't a picture this phone can open.")); };
+    img.src = url;
+  });
+}
+function openProfile(){
+  sheet(`<h3>Profile and theme</h3>
+    <div class="profile"><span class="me big" id="pfPic">${meHtml()}</span>
+      <div class="btns" style="justify-content:center"><button class="btn primary" id="pfPick">${SET.dp ? "Change photo" : "Add a photo"}</button>${SET.dp ? '<button class="btn danger" id="pfRemove">Remove</button>' : ""}</div>
+      <input type="file" id="pfFile" accept="image/*" hidden><span class="muted" id="pfNote">The photo stays on this phone.</span></div>
+    <div class="field"><label for="pfName">Your name</label><input id="pfName" maxlength="24" value="${esc(myName())}" placeholder="Shown in the greeting" autocomplete="off"></div>
+    <div class="field"><label>Theme</label><div class="themes" id="pfThemes">${THEMES.map(([k, l, sw]) => `<button class="theme" data-theme-pick="${k}" aria-pressed="${(SET.theme || "") === k}"><i style="background:${sw}"></i>${l}</button>`).join("")}</div></div>
+    <div class="btns"><button class="btn primary" data-close id="pfDone">Done</button></div>`, root => {
+    const saveName = () => { const v = root.querySelector("#pfName").value.replace(/\s+/g, " ").trim(); if (v !== (SET.name || "")) { SET.name = v === OWN.first ? "" : v; save(); } };
+    root.querySelector("#pfPick").onclick = () => root.querySelector("#pfFile").click();
+    root.querySelector("#pfFile").onchange = async e => {
+      const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+      try { SET.dp = await photoToDataUrl(f); saveName(); save(); openProfile(); go(current); }
+      catch (err) { root.querySelector("#pfNote").innerHTML = `<span style="color:var(--bad)">${esc(err.message)}</span>`; }
+    };
+    const rm = root.querySelector("#pfRemove"); if (rm) rm.onclick = () => { SET.dp = ""; saveName(); save(); openProfile(); go(current); };
+    root.querySelector("#pfThemes").onclick = e => { const b = e.target.closest("[data-theme-pick]"); if (!b) return;
+      SET.theme = b.dataset.themePick; applyTheme(SET.theme); save(); root.querySelectorAll(".theme").forEach(x => x.setAttribute("aria-pressed", x === b)); };
+    root.querySelector("#pfDone").addEventListener("click", () => { saveName(); setTimeout(() => go(current)); });
+    root.addEventListener("cancel", () => { saveName(); setTimeout(() => go(current)); });
+  });
+}
 
 /* ================= Android bridge (does nothing in a normal browser) ================= */
 const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
@@ -290,7 +385,7 @@ async function bootDatabase(){
   const { rows, kv } = await dbLoad();
   const parse = (k, d) => { try { return kv[k] ? JSON.parse(kv[k]) : d; } catch { return d; } };
   if (rows.length || kv.settings) {
-    TX = rows; RULES = parse("rules", {}); NAMES = parse("names", {}); IMPORTS = parse("imports", []); SET = Object.assign({ me: "", family: "", small: 200, lock: false }, parse("settings", {}));
+    TX = rows; RULES = parse("rules", {}); NAMES = parse("names", {}); IMPORTS = parse("imports", []); SET = Object.assign({}, SET_DEFAULTS, parse("settings", {}));
     rows.forEach(t => savedRows.set(t.id, rowSig(t))); savedKV = { rules: kv.rules, settings: kv.settings, imports: kv.imports, names: kv.names };
   }
   persist = dbPersist;       // from here on, saving goes to the database
@@ -364,7 +459,7 @@ function setSubtitle(){
 }
 function greeting(){
   const h = new Date().getHours(), g = h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  return OWN.first ? `${g}, ${OWN.first}` : g;
+  return myName() ? `${g}, ${myName().split(" ")[0]}` : g;
 }
 function go(tab){
   current = tab;
@@ -372,7 +467,9 @@ function go(tab){
   document.querySelectorAll(".tab").forEach(b => b.dataset.tab === lit ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   $("#title").textContent = tab === "home" && TX.length ? greeting() : TITLES[tab];
   $("#backBtn").hidden = tab === "home";
-  $("#topRight").innerHTML = tab === "home" ? `<span class="me" aria-hidden="true">${esc((OWN.first || "F")[0])}</span>` : "";
+  $("#topRight").innerHTML = tab === "home" ? `<button class="me" id="meBtn" aria-label="Profile and theme">${meHtml()}</button>` : "";
+  const mb = $("#meBtn"); if (mb) mb.onclick = openProfile;
+  document.querySelector(".bulkact")?.remove(); if (tab !== "tx") selIds.clear();
   if (tab === "home" && TX.length) $("#subtitle").textContent = "Here's your money story"; else setSubtitle();
   ({ home: Home, tx: Spends, recurring: Recurring, reports: Reports, settings: Settings, add: Add })[tab]();
   window.scrollTo(0, 0);
@@ -407,7 +504,7 @@ function sparkArea(vals, W, H, stroke, fill){
   const mn = Math.min(...vals), mx = Math.max(...vals), sp = mx - mn || 1;
   const pts = vals.map((v, i) => [i / (vals.length - 1) * W, 4 + (H - 8) * (1 - (v - mn) / sp)]);
   const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block" aria-hidden="true"><defs><linearGradient id="spk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".45"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path d="${line} L${W},${H} L0,${H} Z" fill="${fill}"/><path d="${line}" fill="none" stroke="${stroke}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block" aria-hidden="true"><defs><linearGradient id="spk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".45"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="${line} L${W},${H} L0,${H} Z" fill="${fill}"/><path d="${line}" fill="none" stroke="${stroke}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function ring(frac, label, sub){
   const r = 34, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac || 0));
@@ -498,6 +595,9 @@ function Home(){
   wireInsights(ins);
 }
 function reviewNow(){ txFilter = { q: "", cat: "", month: "", dir: "", check: true }; go("tx"); }
+const selIds = new Set();
+// In "Please check" mode each row gets a tick box so many can be handled together
+function pickRow(t){ return `<div class="selrow"><input type="checkbox" class="pick" data-pick="${esc(t.id)}" ${selIds.has(t.id) ? "checked" : ""} aria-label="Select ${esc(t.payee)} ${inr(t.amt)}">${txRow(t)}</div>`; }
 function txRow(t){
   return `<button class="row" data-id="${esc(t.id)}">${av(t.payee, t.cat, t.desc)}<span class="t"><b>${esc(t.payee)}</b><span>${esc(t.cat)} · ${esc(t.channel)} · ${esc(t.bank)}</span></span><span class="a ${t.dir === "in" ? "in" : ""}">${t.dir === "in" ? "+" : "−"}${inr(t.amt)}${needsCheck(t) ? '<small class="chk">check</small>' : t.catSrc === "you" || t.catSrc === "rule" ? "<small>set by you</small>" : ""}</span></button>`;
 }
@@ -523,7 +623,28 @@ function Spends(){
     <input class="search" id="q" type="search" placeholder="Search name, UPI ID, amount" value="${esc(F.q)}" aria-label="Search">
     <div class="chips" id="dchips">${F.day ? `<button class="chipbtn" data-d="day" aria-pressed="true">${fdate(F.day)} only ✕</button>` : ""}${[["","All"],["out","Money out"],["in","Money in"]].map(([v, l]) => `<button class="chipbtn" data-d="${v}" aria-pressed="${!F.check && F.dir === v}">${l}</button>`).join("")}
       <button class="chipbtn" data-d="check" aria-pressed="${F.check}">Please check · ${TX.filter(needsCheck).length}</button></div>
-    <div class="muted num" id="txsum"></div><div class="list" id="txlist"></div>`);
+    <div class="muted num" id="txsum"></div><div id="bulkhead"></div><div class="list" id="txlist"></div>`);
+  let shown = [];
+  const drawBulk = () => {
+    document.querySelector(".bulkact")?.remove();
+    if (!F.check) { $("#bulkhead").innerHTML = ""; selIds.clear(); return; }
+    const ids = shown.map(t => t.id), n = ids.filter(id => selIds.has(id)).length;
+    $("#bulkhead").innerHTML = shown.length ? `<div class="bulkhead"><label class="check"><input type="checkbox" id="selAll" ${n && n === ids.length ? "checked" : ""}> Select all ${ids.length}</label><span class="muted">${n ? n + " selected" : "Tick the ones that are fine"}</span></div>` : "";
+    const all = $("#selAll"); if (all) { all.indeterminate = n > 0 && n < ids.length; all.onchange = () => { ids.forEach(id => all.checked ? selIds.add(id) : selIds.delete(id)); draw(); }; }
+    if (!n) return;
+    const bar = document.createElement("div"); bar.className = "bulkact"; bar.setAttribute("role", "region"); bar.setAttribute("aria-label", "Selected payments");
+    bar.innerHTML = `<b>${n} selected</b><span style="display:flex;gap:8px"><button class="btn" id="bkCat">Set category</button><button class="btn primary" id="bkOk">Looks right</button></span>`;
+    document.body.append(bar);
+    const chosen = () => ids.filter(id => selIds.has(id));
+    bar.querySelector("#bkOk").onclick = () => { const r = bulkReview(chosen()); selIds.clear(); toast(`Marked ${r.done} as checked.`); again(); };
+    bar.querySelector("#bkCat").onclick = () => sheet(`<h3>Set a category for ${n} payment${n > 1 ? "s" : ""}</h3>
+        <div class="field"><label for="bkPick">Category</label><select id="bkPick">${Object.keys(CATS).map(c => `<option>${c}</option>`).join("")}</select></div>
+        <span class="muted">Each one is also marked as checked. A money-in category is skipped for payments going out, and the other way round.</span>
+        <div class="btns"><button class="btn" data-close>Cancel</button><button class="btn primary" id="bkApply">Apply</button></div>`, root => {
+      root.querySelector("#bkApply").onclick = () => { const cat = root.querySelector("#bkPick").value, r = bulkReview(chosen(), cat); selIds.clear(); closeSheet();
+        toast(`${r.done} set to ${cat}.` + (r.skipped ? ` ${r.skipped} skipped: wrong direction.` : "")); again(); };
+    });
+  };
   const draw = () => {
     const q = F.q.toLowerCase();
     const list = TX.filter(t => (!F.day || t.date === F.day) && (!F.check || needsCheck(t)) && (!F.month || t.date.startsWith(F.month)) && (!F.dir || t.dir === F.dir) && (!F.cat || t.cat === F.cat) && (!q || (t.payee + " " + t.desc + " " + t.amt).toLowerCase().includes(q))).slice().reverse();
@@ -531,8 +652,9 @@ function Spends(){
     const o = real.filter(t => t.dir === "out").reduce((a, t) => a + t.amt, 0), i = real.filter(t => t.dir === "in").reduce((a, t) => a + t.amt, 0);
     $("#txsum").textContent = `${list.length} transactions · in ${inr(i)} · out ${inr(o)}` + (own ? ` · ${inr(own)} moved between your own accounts is not counted` : "");
     let html = "", day = "";
-    for (const t of list.slice(0, 400)) { if (t.date !== day) { day = t.date; html += `<div class="daylbl">${fdate(day)} ${day.slice(0, 4)}</div>`; } html += txRow(t); }
-    $("#txlist").innerHTML = html || `<div class="empty">No transactions match.</div>`;
+    for (const t of list.slice(0, 400)) { if (t.date !== day) { day = t.date; html += `<div class="daylbl">${fdate(day)} ${day.slice(0, 4)}</div>`; } html += F.check ? pickRow(t) : txRow(t); }
+    $("#txlist").innerHTML = html || `<div class="empty">${F.check ? "Nothing left to check." : "No transactions match."}</div>`;
+    shown = F.check ? list : []; drawBulk();
   };
   draw();
   const again = () => { const y = window.scrollY; Spends(); window.scrollTo(0, y); };
@@ -545,7 +667,8 @@ function Spends(){
     if (b.dataset.d === "day") { F.day = ""; return again(); }
     if (b.dataset.d === "check") { F.check = true; F.dir = ""; } else { F.check = false; F.dir = b.dataset.d; }
     $("#dchips").querySelectorAll("button").forEach(x => { if (x.dataset.d !== "day") x.setAttribute("aria-pressed", x === b); }); draw(); };
-  $("#txlist").onclick = e => { const r = e.target.closest(".row"); if (r) openTx(r.dataset.id); };
+  $("#txlist").onclick = e => { if (e.target.closest(".pick")) return; const r = e.target.closest(".row"); if (r) openTx(r.dataset.id); };
+  $("#txlist").onchange = e => { const c = e.target.closest(".pick"); if (!c) return; c.checked ? selIds.add(c.dataset.pick) : selIds.delete(c.dataset.pick); drawBulk(); };
 }
 
 function openTx(id){
@@ -704,6 +827,7 @@ $("#file").onchange = e => { const f = [...e.target.files]; e.target.value = "";
 function Settings(){
   const accts = {}; TX.forEach(t => { const k = t.bank + " ••" + t.acct; const a = accts[k] = accts[k] || { n: 0, from: t.date, to: t.date }; a.n++; a.to = t.date; });
   S(`<section class="card"><div class="menu">
+      <button data-go="profile"><span>Profile and theme<small>Your photo, name and colours</small></span><span aria-hidden="true">›</span></button>
       <button data-go="recurring"><span>Recurring payments<small>Auto-debits, bills, SIPs and what's due next</small></span><span aria-hidden="true">›</span></button>
       <button data-go="check"><span>Please check<small>${TX.filter(needsCheck).length} payments the rules weren't sure about</small></span><span aria-hidden="true">›</span></button>
       <button data-go="add"><span>Add statements<small>Pick bank statement PDFs</small></span><span aria-hidden="true">›</span></button></div></section>
@@ -749,7 +873,7 @@ function Settings(){
     try { const r = restoreBackup(JSON.parse(await f.text())); toast(`Restored: ${r.added} added, ${r.skipped} already here` + (r.rules ? `, ${r.rules} rules` : "")); go("settings"); }
     catch (err) { $("#bkNote").innerHTML = `<span style="color:var(--bad)">${esc(err instanceof SyntaxError ? "That file isn't a readable backup." : err.message)}</span>`; }
   };
-  document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => b.dataset.go === "check" ? reviewNow() : go(b.dataset.go));
+  document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => b.dataset.go === "check" ? reviewNow() : b.dataset.go === "profile" ? openProfile() : go(b.dataset.go));
   $("#saveSet").onclick = () => { SET.me = $("#me").value; SET.family = $("#fam").value; SET.small = +$("#small").value || 200; recategoriseAll(); toast("Saved. Transactions re-sorted."); };
   document.querySelectorAll("[data-rule]").forEach(b => b.onclick = () => { delete RULES[b.dataset.rule]; recategoriseAll(); go("settings"); });
   document.querySelectorAll("[data-name]").forEach(b => b.onclick = () => { delete NAMES[b.dataset.name]; recategoriseAll(); go("settings"); });
@@ -799,10 +923,9 @@ document.querySelector("nav.tabs").onclick = e => { const b = e.target.closest("
 $("#fab").onclick = () => go("add");
 $("#backBtn").onclick = () => go(current === "recurring" ? "settings" : "home");
 window.PL = { importBuffer, detectRecurring, get TX(){ return TX; } };
-function startApp(){ recategoriseAll(); go(TX.length ? "home" : "add"); loadSecurePw(); cleanTempFiles(); if (SET.lock && bio) lockScreen(); }
+function startApp(){ applyTheme(SET.theme || ""); recategoriseAll(); go(TX.length ? "home" : "add"); loadSecurePw(); cleanTempFiles(); if (SET.lock && bio) lockScreen(); }
 if (sqlite) bootDatabase().catch(e => { console.error("db boot", e); notify("The database couldn't be opened, so this session uses temporary storage: " + (e.message || e)); }).then(startApp);
 else startApp();
-try { const sb = plugin("SystemBars"); if (sb) sb.setStyle({ style: "DARK" }); } catch {}
 // Android back button: close an open sheet, else go back to Spends, else leave the app
 const appPlugin = plugin("App");
 // Lock again after the app has been in the background for 30 seconds

@@ -14,7 +14,8 @@ let PW = store.get("pw", []);
 let savePw = () => store.set("pw", PW);              // saved PDF passwords [{pw, label, used}]
 let RULES = store.get("rules", {});        // payeeKey -> category (taught by you)
 let NAMES = store.get("names", {});        // payeeKey -> the name you gave it ("Razorpay" -> "Term insurance")
-let SET = Object.assign({ me: "", family: "", small: 200, lock: false }, store.get("settings", {}));
+const SET_DEFAULTS = { me: "", family: "", small: 200, lock: false, theme: "", dp: "", name: "" };
+let SET = Object.assign({}, SET_DEFAULTS, store.get("settings", {}));
 let IMPORTS = store.get("imports", []);
 // Where everything is saved. A browser uses its own storage; the Android app swaps in its encrypted database.
 let persist = () => { store.set("tx", TX); store.set("rules", RULES); store.set("settings", SET); store.set("imports", IMPORTS); store.set("names", NAMES); };
@@ -544,7 +545,10 @@ function restoreBackup(b){
   }
   for (const [k, c] of Object.entries(b.rules || {})) if (!RULES[k] && CATS[c]) { RULES[k] = c; rules++; }
   for (const [k, n] of Object.entries(b.names || {})) if (!NAMES[k] && typeof n === "string" && n.trim()) NAMES[k] = n.trim().slice(0, 40);
-  if (b.settings) { if (!SET.me && typeof b.settings.me === "string") SET.me = b.settings.me; if (!SET.family && typeof b.settings.family === "string") SET.family = b.settings.family; }
+  if (b.settings) {
+    for (const k of ["me", "family", "theme", "name"]) if (!SET[k] && typeof b.settings[k] === "string") SET[k] = b.settings[k].slice(0, 200);
+    if (!SET.dp && typeof b.settings.dp === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(b.settings.dp) && b.settings.dp.length < 300000) SET.dp = b.settings.dp;
+  }
   let pws = 0;
   for (const p of Array.isArray(b.passwords) ? b.passwords : []) if (p && typeof p.pw === "string" && !PW.find(x => x.pw === p.pw)) { PW.push({ pw: p.pw, label: String(p.label || ""), used: 0 }); pws++; }
   if (pws) savePw();
@@ -562,4 +566,22 @@ function commitments(){
   const outs = detectRecurring().filter(r => r.active && r.dir === "out" && !["family", "people"].includes((CATS[r.cat] || [])[0]));
   const fixed = outs.filter(r => r.fixed), variable = outs.filter(r => !r.fixed), sum = l => l.reduce((a, r) => a + r.monthly, 0);
   return { fixed: sum(fixed), variable: sum(variable), fixedItems: fixed, variableItems: variable };
+}
+
+/* ================= reviewing many payments at once ================= */
+// Marks the chosen payments as checked. With a category, also sets it on each one it fits
+// (an income category can't go on a payment out, and the other way round).
+function bulkReview(ids, cat){
+  const want = new Set(ids); let done = 0, skipped = 0;
+  for (const t of TX) {
+    if (!want.has(t.id)) continue;
+    if (cat) {
+      const fits = CATS[cat] && ((CATS[cat][0] === "income") === (t.dir === "in") || ["Own accounts", "Family"].includes(cat));
+      if (!fits) { skipped++; continue; }
+      t.cat = cat; t.catSrc = "you";
+    }
+    t.ok = true; done++;
+  }
+  recategoriseAll();
+  return { done, skipped };
 }

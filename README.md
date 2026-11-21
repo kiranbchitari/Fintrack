@@ -33,7 +33,7 @@ An Android app that reads your bank statement PDFs on the phone and shows where 
 ```bash
 npm install
 npm test          # rule tests, no browser needed
-npm run serve     # try it in a browser at http://localhost:8765
+npm run serve     # try it in a browser at http://localhost:8766
 ```
 
 Build the Android app (needs Android Studio, which provides the SDK and Java):
