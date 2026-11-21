@@ -15,3 +15,7 @@ _test/
 /categorise.py
 /make_outputs.py
 /report-template.html
+
+# built app files
+*.apk
+/dist/

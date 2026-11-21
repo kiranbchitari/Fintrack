@@ -46,6 +46,14 @@ npm run build     # tests, sync web files, build android/app/build/outputs/apk/d
 
 Or open the `android` folder in Android Studio and press Run.
 
+For a small file to put on your own phone (about 5 MB, 64-bit ARM phones only):
+
+```bash
+npm run apk       # writes dist/Fintrack.apk
+```
+
+It is signed with the Android debug key, which is fine for personal use. A Play Store release needs its own signing key in `android/app/build.gradle`.
+
 After changing anything in `www/`, run `npm run sync` before building so the Android project picks it up.
 
 ## Changing the rules

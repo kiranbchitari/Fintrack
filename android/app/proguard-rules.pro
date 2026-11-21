@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# --- Fintrack: plugins are called from JavaScript by name, so their classes must keep their names ---
+-keep class com.getcapacitor.** { *; }
+-keep class com.capacitorjs.plugins.** { *; }
+-keep class com.aparajita.capacitor.** { *; }
+-keep class com.getcapacitor.community.database.sqlite.** { *; }
+# SQLCipher talks to native code through JNI
+-keep class net.zetetic.database.** { *; }
+-dontwarn net.zetetic.**
+-dontwarn org.joda.**
+-dontwarn javax.annotation.**

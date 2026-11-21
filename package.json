@@ -1,6 +1,6 @@
 {
   "name": "fintrack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Fintrack: reads bank statement PDFs on your phone and shows where your money goes. No AI, nothing uploaded.",
   "scripts": {
@@ -8,7 +8,8 @@
     "serve": "python3 -m http.server 8765 --bind 127.0.0.1 --directory www",
     "sync": "cap sync android",
     "build": "npm test && cap sync android && cd android && ./gradlew assembleDebug",
-    "open": "cap open android"
+    "open": "cap open android",
+    "apk": "npm test && cap sync android && cd android && ./gradlew assembleRelease && mkdir -p ../dist && cp app/build/outputs/apk/release/app-release.apk ../dist/Fintrack.apk"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
